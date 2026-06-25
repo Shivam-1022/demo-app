@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-app
+  namespace: uat
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: demo-app
+
+  template:
+    metadata:
+      labels:
+        app: demo-app
+
+    spec:
+      containers:
+      - name: demo-app
+        image: shivam1022/demo-app:latest
+
+        ports:
+        - containerPort: 8080
