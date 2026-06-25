@@ -74,7 +74,7 @@ pipeline {
             }
             steps {
                 sh """
-                sed -i 's|IMAGE_PLACEHOLDER|${IMAGE_NAME}:${IMAGE_TAG}|' k8s/uat/deployment.yaml
+                sed -i 's|IMAGE_PLACEHOLDER|${IMAGE_NAME}:${IMAGE_TAG}|' k8s/uat-deployment.yaml
                 kubectl apply -f k8s/uat/
                 """
             }
@@ -86,6 +86,7 @@ pipeline {
             }
             steps {
                 sh """
+                sed -i 's|IMAGE_PLACEHOLDER|${IMAGE_NAME}:${IMAGE_TAG}|' k8s/prod-deployment.yaml
                 kubectl apply -f k8s/prod/
                 """
             }
