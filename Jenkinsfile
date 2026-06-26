@@ -43,11 +43,7 @@ pipeline {
                 """
             }
         }
-
-        stage('Docker Push') {
-    when {
-        branch 'develop'
-    }
+stage('Docker Push') {
     steps {
         withCredentials([usernamePassword(
             credentialsId: 'dockerhub-creds',
