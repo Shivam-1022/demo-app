@@ -1,5 +1,4 @@
 pipeline {
-
     agent any
 
     environment {
@@ -43,23 +42,29 @@ pipeline {
                 """
             }
         }
-stage('Docker Push') {
-    steps {
-        withCredentials([usernamePassword(
-            credentialsId: 'dockerhub-creds',
-            usernameVariable: 'DOCKER_USER',
-            passwordVariable: 'DOCKER_PASS'
-        )]) {
-            sh """
-                echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
-                docker push ${IMAGE_NAME}:${IMAGE_TAG}
-                docker push ${IMAGE_NAME}:latest
-            """
+
+        stage('Docker Push') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+
+                    sh """
+                        echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
+                        docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                        docker push ${IMAGE_NAME}:latest
+                    """
+                }
+            }
         }
-    }
-}
 
         stage('Deploy UAT') {
+            when {
+                expression { env.BRANCH_NAME == 'develop' }
+            }
+
             steps {
                 sh """
                     sed -i 's|IMAGE_PLACEHOLDER|${IMAGE_NAME}:${IMAGE_TAG}|g' k8s/uat-deployment.yaml
@@ -68,17 +73,32 @@ stage('Docker Push') {
                 """
             }
         }
+
+        stage('Deploy PROD') {
+            when {
+                expression { env.BRANCH_NAME == 'master' }
+            }
+
+            steps {
+                sh """
+                    sed -i 's|IMAGE_PLACEHOLDER|${IMAGE_NAME}:${IMAGE_TAG}|g' k8s/prod-deployment.yaml
+                    kubectl apply -f k8s/prod-deployment.yaml
+                    kubectl apply -f k8s/service.yaml
+                """
+            }
+        }
     }
 
     post {
-
         success {
             echo "Pipeline completed successfully."
-            cleanWs()
         }
 
         failure {
             echo "Pipeline failed."
+        }
+
+        always {
             cleanWs()
         }
     }
