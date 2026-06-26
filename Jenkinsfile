@@ -4,7 +4,7 @@ pipeline {
 
     environment {
         IMAGE_NAME = "shivam1022/demo-app"
-        IMAGE_TAG = "${BUILD_NUMBER}"
+        IMAGE_TAG  = "${BUILD_NUMBER}"
     }
 
     stages {
@@ -12,6 +12,19 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
+            }
+        }
+
+        stage('Check Branch') {
+            steps {
+                script {
+                    env.GIT_BRANCH_NAME = sh(
+                        script: "git rev-parse --abbrev-ref HEAD",
+                        returnStdout: true
+                    ).trim()
+
+                    echo "Current Branch: ${env.GIT_BRANCH_NAME}"
+                }
             }
         }
 
@@ -29,7 +42,9 @@ pipeline {
 
         stage('SonarQube Analysis') {
             when {
-                branch 'develop'
+                expression {
+                    env.GIT_BRANCH_NAME == "develop"
+                }
             }
             steps {
                 withSonarQubeEnv('sonarqube') {
@@ -40,16 +55,22 @@ pipeline {
 
         stage('Docker Build') {
             when {
-                branch 'develop'
+                expression {
+                    env.GIT_BRANCH_NAME == "develop"
+                }
             }
             steps {
-                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+                sh """
+                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                """
             }
         }
 
         stage('Docker Push') {
             when {
-                branch 'develop'
+                expression {
+                    env.GIT_BRANCH_NAME == "develop"
+                }
             }
             steps {
                 withCredentials([usernamePassword(
@@ -57,45 +78,55 @@ pipeline {
                     usernameVariable: 'USER',
                     passwordVariable: 'PASS'
                 )]) {
-                    sh '''
-                    echo $PASS | docker login -u $USER --password-stdin
-                    docker push '"${IMAGE_NAME}:${IMAGE_TAG}"'
-                    '''
+
+                    sh """
+                    echo \$PASS | docker login -u \$USER --password-stdin
+                    docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                    """
                 }
             }
         }
 
         stage('Deploy UAT') {
             when {
-                branch 'develop'
+                expression {
+                    env.GIT_BRANCH_NAME == "develop"
+                }
             }
             steps {
                 sh """
-                sed -i 's|IMAGE_PLACEHOLDER|${IMAGE_NAME}:${IMAGE_TAG}|' k8s/uat-deployment.yaml
-                kubectl apply -f k8s/uat-deployment.yaml
+                    sed -i 's|IMAGE_PLACEHOLDER|${IMAGE_NAME}:${IMAGE_TAG}|' k8s/uat-deployment.yaml
+                    kubectl apply -f k8s/uat-deployment.yaml
                 """
             }
         }
 
         stage('Deploy PROD') {
             when {
-                branch 'main'
+                expression {
+                    env.GIT_BRANCH_NAME == "main"
+                }
             }
             steps {
                 sh """
-                sed -i 's|IMAGE_PLACEHOLDER|${IMAGE_NAME}:${IMAGE_TAG}|' k8s/prod-deployment.yaml
-                kubectl apply -f k8s/prod-deployment.yaml
+                    sed -i 's|IMAGE_PLACEHOLDER|${IMAGE_NAME}:${IMAGE_TAG}|' k8s/prod-deployment.yaml
+                    kubectl apply -f k8s/prod-deployment.yaml
                 """
             }
         }
     }
 
     post {
-        success {
-            echo 'Pipeline completed successfully.'
+        always {
+            cleanWs()
         }
+
+        success {
+            echo "Pipeline completed successfully."
+        }
+
         failure {
-            echo 'Pipeline failed.'
+            echo "Pipeline failed."
         }
     }
 }
