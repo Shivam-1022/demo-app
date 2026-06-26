@@ -17,17 +17,17 @@ pipeline {
 
         stage('Build') {
             steps {
-                dir('my-app') {
+                
                     sh 'mvn clean package'
-                }
+                
             }
         }
 
         stage('Test') {
             steps {
-                dir('my-app') {
+               
                     sh 'mvn test'
-                }
+                
             }
         }
 
@@ -36,10 +36,10 @@ pipeline {
                 branch 'develop'
             }
             steps {
-                dir('my-app') {
+                
                     withSonarQubeEnv('sonarqube') {
                         sh 'mvn sonar:sonar -Dsonar.projectKey=demo-app'
-                    }
+                    
                 }
             }
         }
@@ -49,11 +49,11 @@ pipeline {
                 branch 'develop'
             }
             steps {
-                dir('my-app') {
+                
                     sh """
                         docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
                     """
-                }
+                
             }
         }
 
@@ -62,7 +62,7 @@ pipeline {
                 branch 'develop'
             }
             steps {
-                dir('my-app') {
+                
                     withCredentials([usernamePassword(
                         credentialsId: 'dockerhub-creds',
                         usernameVariable: 'USER',
@@ -72,7 +72,7 @@ pipeline {
                             echo $PASS | docker login -u $USER --password-stdin
                             docker push '"${IMAGE_NAME}:${IMAGE_TAG}"'
                         '''
-                    }
+                    
                 }
             }
         }
@@ -82,12 +82,12 @@ pipeline {
                 branch 'develop'
             }
             steps {
-                dir('my-app') {
+                
                     sh """
                         sed -i 's|IMAGE_PLACEHOLDER|${IMAGE_NAME}:${IMAGE_TAG}|' k8s/uat-deployment.yaml
                         kubectl apply -f k8s/uat-deployment.yaml
                     """
-                }
+                
             }
         }
 
@@ -96,12 +96,12 @@ pipeline {
                 branch 'main'
             }
             steps {
-                dir('my-app') {
+               
                     sh """
                         sed -i 's|IMAGE_PLACEHOLDER|${IMAGE_NAME}:${IMAGE_TAG}|' k8s/prod-deployment.yaml
                         kubectl apply -f k8s/prod-deployment.yaml
                     """
-                }
+                
             }
         }
     }
