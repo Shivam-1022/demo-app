@@ -1,11 +1,5 @@
 pipeline {
-
     agent any
-
-    environment {
-        IMAGE_NAME = "shivam1022/demo-app"
-        IMAGE_TAG = "${BUILD_NUMBER}"
-    }
 
     stages {
 
@@ -15,108 +9,25 @@ pipeline {
             }
         }
 
+        stage('Debug') {
+            steps {
+                sh '''
+                    pwd
+                    ls -la
+                '''
+            }
+        }
+
         stage('Build') {
             steps {
-                
-                    sh 'mvn clean package'
-                
+                sh 'mvn clean package'
             }
         }
 
         stage('Test') {
             steps {
-               
-                    sh 'mvn test'
-                
+                sh 'mvn test'
             }
-        }
-
-        stage('SonarQube Analysis') {
-            when {
-                branch 'develop'
-            }
-            steps {
-                
-                    withSonarQubeEnv('sonarqube') {
-                        sh 'mvn sonar:sonar -Dsonar.projectKey=demo-app'
-                    
-                }
-            }
-        }
-
-        stage('Docker Build') {
-            when {
-                branch 'develop'
-            }
-            steps {
-                
-                    sh """
-                        docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
-                    """
-                
-            }
-        }
-
-        stage('Docker Push') {
-            when {
-                branch 'develop'
-            }
-            steps {
-                
-                    withCredentials([usernamePassword(
-                        credentialsId: 'dockerhub-creds',
-                        usernameVariable: 'USER',
-                        passwordVariable: 'PASS'
-                    )]) {
-                        sh '''
-                            echo $PASS | docker login -u $USER --password-stdin
-                            docker push '"${IMAGE_NAME}:${IMAGE_TAG}"'
-                        '''
-                    
-                }
-            }
-        }
-
-        stage('Deploy UAT') {
-            when {
-                branch 'develop'
-            }
-            steps {
-                
-                    sh """
-                        sed -i 's|IMAGE_PLACEHOLDER|${IMAGE_NAME}:${IMAGE_TAG}|' k8s/uat-deployment.yaml
-                        kubectl apply -f k8s/uat-deployment.yaml
-                    """
-                
-            }
-        }
-
-        stage('Deploy PROD') {
-            when {
-                branch 'main'
-            }
-            steps {
-               
-                    sh """
-                        sed -i 's|IMAGE_PLACEHOLDER|${IMAGE_NAME}:${IMAGE_TAG}|' k8s/prod-deployment.yaml
-                        kubectl apply -f k8s/prod-deployment.yaml
-                    """
-                
-            }
-        }
-    }
-
-    post {
-        always {
-            //cleanWs()
-        }
-
-        success {
-            echo "Pipeline completed successfully."
-        }
-
-        failure {
-            echo "Pipeline failed."
         }
     }
 }
