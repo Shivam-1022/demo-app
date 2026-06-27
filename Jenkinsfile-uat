@@ -1,9 +1,11 @@
+```groovy
 pipeline {
     agent any
 
     environment {
         IMAGE_NAME = "shivam1022/demo-app"
-        IMAGE_TAG  = "${BUILD_NUMBER}"
+        IMAGE_TAG = "v${BUILD_NUMBER}"
+        GITOPS_REPO = "https://github.com/Shivam-1022/demo-app-gitops.git"
     }
 
     stages {
@@ -60,27 +62,68 @@ pipeline {
             }
         }
 
-        stage('Deploy UAT') {
-            
+        stage('Clone GitOps Repo') {
             steps {
                 sh """
-                    sed -i 's|IMAGE_PLACEHOLDER|${IMAGE_NAME}:${IMAGE_TAG}|g' k8s/uat-deployment.yaml
-                    kubectl apply -f k8s/uat-deployment.yaml
-                    kubectl apply -f k8s/service.yaml
+                    rm -rf demo-app-gitops
+                    git clone ${GITOPS_REPO}
                 """
             }
         }
 
-        
+        stage('Update UAT Helm Chart') {
+            steps {
+                sh """
+                    cd demo-app-gitops/demo-app
+
+                    sed -i 's/tag:.*/tag: ${IMAGE_TAG}/' values.yaml
+
+                    echo "Updated values.yaml"
+
+                    cat values.yaml
+                """
+            }
+        }
+
+        stage('Commit and Push') {
+            steps {
+
+                withCredentials([usernamePassword(
+                    credentialsId: 'github-creds',
+                    usernameVariable: 'GIT_USER',
+                    passwordVariable: 'GIT_TOKEN'
+                )]) {
+
+                    sh """
+                        cd demo-app-gitops
+
+                        git config user.name "Jenkins"
+                        git config user.email "jenkins@local"
+
+                        git add .
+
+                        if ! git diff --cached --quiet
+                        then
+                            git commit -m "Update image to ${IMAGE_TAG}"
+                            git push https://\$GIT_USER:\$GIT_TOKEN@github.com/Shivam-1022/demo-app-gitops.git main
+                        else
+                            echo "No changes detected."
+                        fi
+                    """
+                }
+            }
+        }
+
     }
 
     post {
+
         success {
-            echo "Pipeline completed successfully."
+            echo "UAT Pipeline completed successfully."
         }
 
         failure {
-            echo "Pipeline failed."
+            echo "UAT Pipeline failed."
         }
 
         always {
@@ -88,3 +131,4 @@ pipeline {
         }
     }
 }
+```
